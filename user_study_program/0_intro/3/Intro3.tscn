@@ -1,0 +1,87 @@
+[gd_scene load_steps=6 format=2]
+
+[ext_resource path="res://0_intro/SceneChangeButton.gd" type="Script" id=1]
+[ext_resource path="res://misc/Merriweather.tres" type="DynamicFont" id=2]
+[ext_resource path="res://0_intro/3/ConsentLinkLabel.gd" type="Script" id=3]
+[ext_resource path="res://0_intro/ZoomableImage.gd" type="Script" id=4]
+[ext_resource path="res://0_intro/3/fullscreen.png" type="Texture" id=5]
+
+[node name="Control" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="RichTextLabel" type="RichTextLabel" parent="."]
+margin_left = 69.0
+margin_top = 14.0
+margin_right = 691.0
+margin_bottom = 258.0
+custom_fonts/normal_font = ExtResource( 2 )
+bbcode_enabled = true
+bbcode_text = "
+Before starting the study, please make sure:
+- you've downloaded and signed the [color=#8AB4F8][url=https://www.tudelft.nl/]Informed Consent Form [LINK REDACTED][/url][/color]
+       (click on the link to download the form);
+- you're sitting ~50cm away from your screen
+       (assuming a normal-sized screen of 15 inches);
+- the lights in your room are dimmed or turned off completely;
+- all screen filters (like 'Night Light' on Windows) are turned off;
+- this window is in full-screen (look at the image for instructions).
+"
+text = "
+Before starting the study, please make sure:
+- you've downloaded and signed the Informed Consent Form [LINK REDACTED]
+       (click on the link to download the form);
+- you're sitting ~50cm away from your screen
+       (assuming a normal-sized screen of 15 inches);
+- the lights in your room are dimmed or turned off completely;
+- all screen filters (like 'Night Light' on Windows) are turned off;
+- this window is in full-screen (look at the image for instructions).
+"
+script = ExtResource( 3 )
+
+[node name="RichTextLabel2" type="RichTextLabel" parent="."]
+margin_left = 211.0
+margin_top = 264.0
+margin_right = 485.0
+margin_bottom = 329.0
+custom_fonts/normal_font = ExtResource( 2 )
+bbcode_enabled = true
+bbcode_text = "
+[center][wave amp=20 freq=2]Are you ready?[/wave][/center]
+"
+text = "
+Are you ready?
+"
+
+[node name="NextIntroButton" type="Button" parent="."]
+margin_left = 104.0
+margin_top = 325.0
+margin_right = 351.0
+margin_bottom = 354.0
+rect_scale = Vector2( 2, 2 )
+custom_fonts/font = ExtResource( 2 )
+text = "Yes, I am ready. Start the study!"
+script = ExtResource( 1 )
+scene_path = "res://1_main/Main.tscn"
+
+[node name="PreviousIntroButton" type="Button" parent="."]
+margin_left = 21.0
+margin_top = 465.0
+margin_right = 109.0
+margin_bottom = 494.0
+rect_scale = Vector2( 2, 2 )
+custom_fonts/font = ExtResource( 2 )
+text = "Previous"
+script = ExtResource( 1 )
+scene_path = "res://0_intro/2/Intro2.tscn"
+
+[node name="2" type="TextureButton" parent="."]
+margin_left = 531.0
+margin_top = 53.0
+margin_right = 1082.5
+margin_bottom = 363.0
+texture_normal = ExtResource( 5 )
+expand = true
+script = ExtResource( 4 )
+
+[connection signal="meta_clicked" from="RichTextLabel" to="RichTextLabel" method="_on_RichTextLabel_meta_clicked"]

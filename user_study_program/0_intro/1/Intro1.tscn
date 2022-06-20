@@ -1,0 +1,103 @@
+[gd_scene load_steps=5 format=2]
+
+[ext_resource path="res://0_intro/1/chromadepth_image.jpg" type="Texture" id=1]
+[ext_resource path="res://0_intro/ZoomableImage.gd" type="Script" id=2]
+[ext_resource path="res://0_intro/SceneChangeButton.gd" type="Script" id=3]
+[ext_resource path="res://misc/Merriweather.tres" type="DynamicFont" id=4]
+
+[node name="Intro1" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="RichTextLabel" type="RichTextLabel" parent="."]
+margin_left = 20.0
+margin_top = 10.0
+margin_right = 940.0
+margin_bottom = 362.0
+custom_fonts/normal_font = ExtResource( 4 )
+bbcode_enabled = true
+bbcode_text = "
+[center][wave amp=20 freq=2]CSE3000 Research Project - Chromostereoscopy #3: Optimization
+Thomas Sjerps, CSE Year 3
+[REVISION][/wave][/center]
+[center]
+Thanks for participating in my study!
+
+If everything went to plan, you should have received ChromaDepth glasses. These are like normal 3D glasses, kind of.
+When you're wearing these glasses, they make red things look close-by and make blue things look far away.
+
+Take a look at the colorful picture while wearing the glasses.
+You should see the blue in the back, the red in the front and the green in-between. Trippy, right?
+[/center]
+"
+text = "
+CSE3000 Research Project - Chromostereoscopy #3: Optimization
+Thomas Sjerps, CSE Year 3
+[REVISION]
+
+Thanks for participating in my study!
+
+If everything went to plan, you should have received ChromaDepth glasses. These are like normal 3D glasses, kind of.
+When you're wearing these glasses, they make red things look close-by and make blue things look far away.
+
+Take a look at the colorful picture while wearing the glasses.
+You should see the blue in the back, the red in the front and the green in-between. Trippy, right?
+
+"
+
+[node name="NextIntroButton" type="Button" parent="."]
+margin_left = 765.0
+margin_top = 468.0
+margin_right = 853.0
+margin_bottom = 497.0
+rect_scale = Vector2( 2, 2 )
+custom_fonts/font = ExtResource( 4 )
+text = "Next"
+script = ExtResource( 3 )
+scene_path = "res://0_intro/2/Intro2.tscn"
+
+[node name="ChromadepthImage" type="TextureButton" parent="."]
+margin_left = 307.0
+margin_top = 278.0
+margin_right = 677.0
+margin_bottom = 472.0
+rect_min_size = Vector2( -1, -1 )
+texture_normal = ExtResource( 1 )
+texture_pressed = ExtResource( 1 )
+texture_hover = ExtResource( 1 )
+texture_disabled = ExtResource( 1 )
+texture_focused = ExtResource( 1 )
+expand = true
+script = ExtResource( 2 )
+
+[node name="RichTextLabel2" type="RichTextLabel" parent="."]
+margin_left = 331.0
+margin_top = 472.0
+margin_right = 654.0
+margin_bottom = 539.0
+custom_fonts/normal_font = ExtResource( 4 )
+bbcode_enabled = true
+bbcode_text = "
+[center][wave amp=20 freq=2]Tip: click the image to make it bigger![/wave][/center]
+"
+text = "
+Tip: click the image to make it bigger!
+"
+
+[node name="FullText" type="RichTextLabel" parent="."]
+visible = false
+margin_left = 165.0
+margin_top = 434.0
+margin_right = 492.0
+margin_bottom = 503.0
+rect_scale = Vector2( 2, 2 )
+mouse_filter = 2
+custom_colors/font_color_shadow = Color( 0, 0, 0, 1 )
+custom_fonts/normal_font = ExtResource( 4 )
+bbcode_enabled = true
+bbcode_text = "
+[center][wave amp=20 freq=2]Click to make the image smaller again.[/wave][/center]
+"
+text = "
+Click to make the image smaller again.
+"

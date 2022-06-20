@@ -1,0 +1,46 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=4
+
+_global_script_classes=[ {
+"base": "Node",
+"class": "Parameter",
+"language": "GDScript",
+"path": "res://parameters/Parameter.gd"
+} ]
+_global_script_class_icons={
+"Parameter": ""
+}
+
+[application]
+
+config/name="RP Application"
+run/main_scene="res://Main.tscn"
+config/icon="res://misc/icon.png"
+
+[autoload]
+
+FileHandler="*res://misc/FileHandler.gd"
+
+[debug]
+
+settings/fps/force_fps=60
+
+[display]
+
+window/size/resizable=false
+
+[physics]
+
+common/enable_pause_aware_picking=true
+
+[rendering]
+
+environment/default_clear_color=Color( 0, 0, 0, 1 )
+environment/default_environment="res://default_env.tres"

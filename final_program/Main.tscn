@@ -1,0 +1,841 @@
+[gd_scene load_steps=18 format=2]
+
+[ext_resource path="res://parameters/SliderParameter.tscn" type="PackedScene" id=1]
+[ext_resource path="res://misc/JetBrainsMono-Regular.ttf" type="DynamicFontData" id=2]
+[ext_resource path="res://misc/Viewports.gd" type="Script" id=3]
+[ext_resource path="res://misc/icon.png" type="Texture" id=5]
+[ext_resource path="res://Main.gd" type="Script" id=6]
+[ext_resource path="res://parameters/ParameterToggle.gd" type="Script" id=8]
+[ext_resource path="res://misc/Toolbar.gd" type="Script" id=9]
+[ext_resource path="res://parameters/OptionParameter.tscn" type="PackedScene" id=10]
+[ext_resource path="res://images/cube_depth.png" type="Texture" id=12]
+[ext_resource path="res://images/cube_colour.png" type="Texture" id=13]
+
+[sub_resource type="DynamicFont" id=1]
+size = 35
+font_data = ExtResource( 2 )
+
+[sub_resource type="ViewportTexture" id=8]
+viewport_path = NodePath("Results/Viewports/FinalImageViewportContainer/Viewport")
+
+[sub_resource type="Shader" id=10]
+code = "shader_type canvas_item;
+
+uniform sampler2D final_texture;
+uniform sampler2D colour_texture;
+uniform sampler2D depth_texture;
+
+uniform float f : hint_range(0, 1) = 0.5;
+
+/**
+ * @author Markus Ekholm
+ * @copyright 2012-2016 (c) Markus Ekholm <markus at botten dot org >
+ * @license Copyright (c) 2012-2016, Markus Ekholm
+ * All rights reserved.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *    * Redistributions of source code must retain the above copyright
+ *      notice, this list of conditions and the following disclaimer.
+ *    * Redistributions in binary form must reproduce the above copyright
+ *      notice, this list of conditions and the following disclaimer in the
+ *      documentation and/or other materials provided with the distribution.
+ *    * Neither the name of the author nor the
+ *      names of its contributors may be used to endorse or promote products
+ *      derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL MARKUS EKHOLM BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/**
+ * INTERNAL FUNCTIONS
+ */
+bool float_equals(float f1, float f2) {
+	return abs(f1 - f2) < 0.001;
+}
+
+float hp_f(float x, float y) //(7)
+{
+  if(float_equals(x, 0.) && float_equals(y, 0.)) return 0.;
+  else{
+    float tmphp = degrees(atan(y, x)); //TODO: maybe swap y and x?
+    if(tmphp >= 0.) return tmphp;
+    else            return tmphp + 360.;
+  }
+}
+
+float dhp_f(float C1, float C2, float h1p, float h2p) //(10)
+{
+  if(float_equals(C1*C2, 0.))   return 0.;
+  else if(abs(h2p-h1p) <= 180.) return h2p-h1p;
+  else if((h2p-h1p) > 180.)     return (h2p-h1p)-360.;
+  else if((h2p-h1p) < -180.)    return (h2p-h1p)+360.;
+
+  return 0.;
+}
+
+float a_hp_f(float C1, float C2, float h1p, float h2p) { //(14)
+  if(float_equals(C1*C2, 0.))                           return h1p+h2p;
+  else if(abs(h1p-h2p)<= 180.)                          return (h1p+h2p)/2.;
+  else if((abs(h1p-h2p) > 180.) && ((h1p+h2p) < 360.))  return (h1p+h2p+360.)/2.;
+  else if((abs(h1p-h2p) > 180.) && ((h1p+h2p) >= 360.)) return (h1p+h2p-360.)/2.;
+
+  return 0.;
+}
+
+
+
+/**
+ * API FUNCTIONS
+ */
+
+
+/**
+ * Returns c converted to xyzcolor.
+ * @param {rgbcolor} c should have fields R,G,B (case insensitive)
+ * @return {xyzcolor} c converted to xyzcolor
+ */
+vec3 rgb_to_xyz(vec3 c)
+{
+  // Based on http://www.easyrgb.com/index.php?X=MATH&H=02
+  float R = ( c.r / 255. );
+  float G = ( c.g / 255. );
+  float B = ( c.b / 255. );
+
+  if ( R > 0.04045 ) R = pow(( ( R + 0.055 ) / 1.055 ),2.4);
+  else               R = R / 12.92;
+  if ( G > 0.04045 ) G = pow(( ( G + 0.055 ) / 1.055 ),2.4);
+  else               G = G / 12.92;
+  if ( B > 0.04045 ) B = pow(( ( B + 0.055 ) / 1.055 ), 2.4);
+  else               B = B / 12.92;
+
+  R *= 100.;
+  G *= 100.;
+  B *= 100.;
+
+  // Observer. = 2°, Illuminant = D65
+  float X = R * 0.4124 + G * 0.3576 + B * 0.1805;
+  float Y = R * 0.2126 + G * 0.7152 + B * 0.0722;
+  float Z = R * 0.0193 + G * 0.1192 + B * 0.9505;
+  
+  return vec3(X, Y, Z);
+}
+
+/**
+* Returns c converted to labcolor.
+* @param {xyzcolor} c should have fields X,Y,Z
+* @return {labcolor} c converted to labcolor
+*/
+vec3 xyz_to_lab(vec3 c)
+{
+  // Based on http://www.easyrgb.com/index.php?X=MATH&H=07
+  float ref_Y = 100.000;
+  float ref_Z = 108.883;
+  float ref_X = 95.047; // Observer= 2°, Illuminant= D65
+  float Y = c.y / ref_Y;
+  float Z = c.z / ref_Z;
+  float X = c.x / ref_X;
+  if ( X > 0.008856 ) X = pow(X, 1./3.);
+  else                X = ( 7.787 * X ) + ( 16. / 116. );
+  if ( Y > 0.008856 ) Y = pow(Y, 1./3.);
+  else                Y = ( 7.787 * Y ) + ( 16. / 116. );
+  if ( Z > 0.008856 ) Z = pow(Z, 1./3.);
+  else                Z = ( 7.787 * Z ) + ( 16. / 116. );
+  float L = ( 116. * Y ) - 16.;
+  float a = 500. * ( X - Y );
+  float b = 200. * ( Y - Z );
+  
+  return vec3(L, a, b);
+}
+
+/**
+* Returns c converted to labcolor.
+* @param {rgbcolor} c should have fields R,G,B (case insensitive)
+* @return {labcolor} c converted to labcolor
+*/
+vec3 rgb_to_lab(vec3 c)
+{
+  return xyz_to_lab(rgb_to_xyz(c));
+}
+
+
+/**
+ * API FUNCTIONS
+ */
+
+/**
+* Returns diff between c1 and c2 using the CIEDE2000 algorithm
+* @param {labcolor} c1    Should have fields L,a,b
+* @param {labcolor} c2    Should have fields L,a,b
+* @return {float}   Difference between c1 and c2
+*/
+float ciede2000(vec3 c1, vec3 c2)
+{
+  /**
+   * Implemented as in \"The CIEDE2000 Color-Difference Formula:
+   * Implementation Notes, Supplementary Test Data, and Mathematical Observations\"
+   * by Gaurav Sharma, Wencheng Wu and Edul N. Dalal.
+   */
+
+  // Get L,a,b values for color 1
+  float L1 = c1.x;
+  float a1 = c1.y;
+  float b1 = c1.z;
+
+  // Get L,a,b values for color 2
+  float L2 = c2.x;
+  float a2 = c2.y;
+  float b2 = c2.z;
+
+  // Weight factors
+  float kL = 1.;
+  float kC = 1.;
+  float kH = 1.;
+
+  /**
+   * Step 1: Calculate C1p, C2p, h1p, h2p
+   */
+  float C1 = sqrt(pow(a1, 2) + pow(b1, 2)); //(2)
+  float C2 = sqrt(pow(a2, 2) + pow(b2, 2)); //(2)
+
+  float a_C1_C2 = (C1+C2)/2.0;             //(3)
+
+  float G = 0.5 * (1. - sqrt(pow(a_C1_C2 , 7.0) /
+                          (pow(a_C1_C2, 7.0) + pow(25.0, 7.0)))); //(4)
+
+  float a1p = (1.0 + G) * a1; //(5)
+  float a2p = (1.0 + G) * a2; //(5)
+
+  float C1p = sqrt(pow(a1p, 2) + pow(b1, 2)); //(6)
+  float C2p = sqrt(pow(a2p, 2) + pow(b2, 2)); //(6)
+
+  float h1p = hp_f(b1, a1p); //(7)
+  float h2p = hp_f(b2, a2p); //(7)
+
+  /**
+   * Step 2: Calculate dLp, dCp, dHp
+   */
+  float dLp = L2 - L1; //(8)
+  float dCp = C2p - C1p; //(9)
+
+  float dhp = dhp_f(C1,C2, h1p, h2p); //(10)
+  float dHp = 2.*sqrt(C1p*C2p)*sin(radians(dhp)/2.0); //(11)
+
+  /**
+   * Step 3: Calculate CIEDE2000 Color-Difference
+   */
+  float a_L = (L1 + L2) / 2.0; //(12)
+  float a_Cp = (C1p + C2p) / 2.0; //(13)
+
+  float a_hp = a_hp_f(C1,C2,h1p,h2p); //(14)
+  float T = 1.-0.17*cos(radians(a_hp-3.0))+0.24*cos(radians(2.*a_hp))+
+    0.32*cos(radians(3.*a_hp+6.))-0.20*cos(radians(4.*a_hp-63.)); //(15)
+  float d_ro = 30. * exp(-(pow((a_hp-275.)/25.,2))); //(16)
+  float RC = sqrt((pow(a_Cp, 7.0)) / (pow(a_Cp, 7.0) + pow(25.0, 7.0)));//(17)
+  float SL = 1. + ((0.015 * pow(a_L - 50., 2.)) /
+                sqrt(20. + pow(a_L - 50., 2.)));//(18)
+  float SC = 1. + 0.045 * a_Cp;//(19)
+  float SH = 1. + 0.015 * a_Cp * T;//(20)
+  float RT = -2. * RC * sin(radians(2. * d_ro));//(21)
+  float dE = sqrt(pow(dLp /(SL * kL), 2) + pow(dCp /(SC * kC), 2) +
+                pow(dHp /(SH * kH), 2) + RT * (dCp /(SC * kC)) *
+                (dHp / (SH * kH))); //(22)
+  return dE;
+}
+
+// utility function to convert RGB to HSL
+vec3 rgb_to_hsl(vec3 rgb) {
+	float R = rgb.r;
+	float G = rgb.g;
+	float B = rgb.b;
+	
+	float Xmax = max(max(R, G), B);
+	float Xmin = min(min(R, G), B);
+	
+	float L = (Xmax + Xmin) / 2.;
+	
+	float V = Xmax;
+	float C = 2. * (V - L);
+	
+	float H;
+	if (float_equals(C, 0.)) H = 0.;
+	else if (float_equals(V, R)) H = 0. + (G - B) / C;
+	else if (float_equals(V, G)) H = 2. + (B - R) / C;
+	else if (float_equals(V, B)) H = 4. + (R - G) / C;
+	H *= 60.;
+	
+	float S;
+	if (float_equals(L, 0.) || float_equals(L, 1.)) S = 0.;
+	else S = (V - L) / min(L, 1. - L);
+	
+	return vec3(H, S, L);
+}
+
+// -
+void fragment() {
+	/*
+	vec3 c_final = texture(final_texture, vec2(UV.x, 1. - UV.y)).rgb;
+	vec3 c_colour = texture(colour_texture, UV).rgb;
+	float c_depth = texture(depth_texture, UV).r;
+	
+	// calculate V_C
+	float V_C = ciede2000(rgb_to_lab(c_final), rgb_to_lab(c_colour));
+	V_C = pow(V_C, 2);
+	
+	// calculate reconstructed depth buffer
+	vec3 final_hsl = rgb_to_hsl(c_final.rgb);
+	float depth = final_hsl.y * (1. - rgb_to_hsl(c_final).x / 240.) + (1. - final_hsl.y) * 0.5;
+	
+	// calculate V_D
+	float V_D = abs(depth - c_depth);
+	V_D = pow(V_D, 2);
+	
+	float V = f * V_D * (1. - f) * V_C;
+	COLOR.rgb = vec3(pow(V, 0.3));
+	*/
+	
+	vec3 c_final = texture(final_texture, vec2(UV.x, 1. - UV.y)).rgb;
+	vec3 c_colour = texture(colour_texture, UV).rgb;
+	float c_depth = texture(depth_texture, UV).r;
+	
+	float V_C = ciede2000(rgb_to_lab(c_final), rgb_to_lab(c_colour));
+	V_C = pow(V_C, 2);
+	
+	vec3 final_hsl = rgb_to_hsl(c_final.rgb);
+	float depth = final_hsl.y * (1. - rgb_to_hsl(c_final).x / 240.) + (1. - final_hsl.y) * 0.5;
+	
+	float V_D = abs(depth - c_depth);
+	V_D = pow(V_D, 2);
+	
+	float V = f * V_D + (1. - f) * V_C;
+	COLOR.rgb = vec3(pow(V, 0.3));
+}"
+
+[sub_resource type="ViewportTexture" id=9]
+viewport_path = NodePath("Results/Viewports/FinalImageViewportContainer/Viewport")
+
+[sub_resource type="ShaderMaterial" id=6]
+resource_local_to_scene = true
+render_priority = -1
+shader = SubResource( 10 )
+shader_param/f = 0.5
+shader_param/final_texture = SubResource( 9 )
+shader_param/colour_texture = ExtResource( 13 )
+shader_param/depth_texture = ExtResource( 12 )
+
+[sub_resource type="Shader" id=11]
+code = "
+shader_type canvas_item;
+
+
+// textures
+uniform sampler2D depth_texture;
+uniform sampler2D colour_texture;
+
+// DEPTH MAPPING
+uniform float p_near : hint_range(0, 1) = 1.0;
+uniform float p_far : hint_range(0, 1) = 0.0;
+
+uniform int gradient_mode = 0;
+
+// BLENDING
+uniform float p_blending : hint_range(0, 1) = 0.5;
+
+uniform int blending_mode = 0;
+
+
+// utility function for float equality
+bool float_equals(float f1, float f2) {
+	return abs(f1 - f2) < 0.001;
+}
+
+// utility function to convert RGB to HSL
+vec3 rgb_to_hsl(vec3 rgb) {
+	float R = rgb.r;
+	float G = rgb.g;
+	float B = rgb.b;
+	
+	float Xmax = max(max(R, G), B);
+	float Xmin = min(min(R, G), B);
+	
+	float L = (Xmax + Xmin) / 2.;
+	
+	float V = Xmax;
+	float C = 2. * (V - L);
+	
+	float H;
+	if (float_equals(C, 0.)) H = 0.;
+	else if (float_equals(V, R)) H = 0. + (G - B) / C;
+	else if (float_equals(V, G)) H = 2. + (B - R) / C;
+	else if (float_equals(V, B)) H = 4. + (R - G) / C;
+	H *= 60.;
+	
+	float S;
+	if (float_equals(L, 0.) || float_equals(L, 1.)) S = 0.;
+	else S = (V - L) / min(L, 1. - L);
+	
+	return vec3(H, S, L);
+}
+
+// utility function to convert HSL to RGB
+vec3 hsl_to_rgb(vec3 hsl) {
+	float H = hsl.x;
+	float S = hsl.y;
+	float L = hsl.z;
+	
+	float C = (1. - abs(2. * L - 1.)) * S;
+	float Hp = H/60.;
+	float X = C * (1. - abs(mod(Hp, 2.) - 1.));
+	
+	vec3 result;
+	
+	float m = L - (C / 2.);
+	C += m;
+	X += m;
+	
+	if (Hp < 1.) return vec3(C, X, m);
+	if (Hp < 2.) return vec3(X, C, m);
+	if (Hp < 3.) return vec3(m, C, X);
+	if (Hp < 4.) return vec3(m, X, C);
+	if (Hp < 5.) return vec3(X, m, C);
+	return vec3(C, m, X);
+}
+
+// converts a depth value to the 'Red-to-white-to-blue' gradient
+vec3 value_to_redwhiteblue(float x) {
+	if (x < 0.5) {
+		float rg = 2.0 * x;
+		return vec3(rg, rg, 1);
+	}
+	else {
+		float gb = 2.0 * (1.0 - x);
+		return vec3(1, gb, gb);
+	}
+}
+
+// converts a depth value to the 'Rainbow' gradient
+vec3 value_to_rainbow(float x) {
+	return hsl_to_rgb(vec3(240. - x * 240., 1, 0.5));
+}
+
+// -
+void fragment() {
+	// DEPTH MAPPING
+	// Get value of depth image
+	float d = texture(depth_texture, UV).r;
+	
+	// Apply near and far values
+	d = (d - p_far) / (p_near - p_far);
+	d = clamp(d, 0.0, 1.0);
+	
+	// Map the value to the new colour
+	vec3 c_gradient = (gradient_mode == 0) ? value_to_rainbow(d) : value_to_redwhiteblue(d);
+	
+	// BLENDING
+	vec3 c_colour_in = texture(colour_texture, UV).rgb;
+	
+	// 'colour' blending mode
+	if (blending_mode == 0) {
+		// linear interpolation between gradient and colour image
+		COLOR.rgb = mix(c_colour_in, c_gradient, p_blending);
+	}
+	else {
+		// convert values to hsl
+		vec3 c_gradient_hsl = rgb_to_hsl(c_gradient);
+		vec3 c_colour_in_hsl = rgb_to_hsl(c_colour_in);
+		
+		// get hue and saturation of gradient, keep lightness of original colour image
+		c_gradient = hsl_to_rgb(vec3(c_gradient_hsl.x, c_gradient_hsl.y, c_colour_in_hsl.z));
+		
+		// correct blending mode to white colour
+		float new_p_blending = 2. * p_blending * (1. - c_gradient_hsl.z);
+		
+		// interpolate with factor
+		COLOR.rgb = mix(c_colour_in, c_gradient, new_p_blending);
+	}
+}
+"
+
+[sub_resource type="ShaderMaterial" id=2]
+render_priority = -1
+shader = SubResource( 11 )
+shader_param/p_near = 1.0
+shader_param/p_far = 0.0
+shader_param/gradient_mode = 0
+shader_param/p_blending = 0.5
+shader_param/blending_mode = 0
+shader_param/depth_texture = ExtResource( 12 )
+shader_param/colour_texture = ExtResource( 13 )
+
+[node name="Main" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource( 6 )
+
+[node name="Toolbar" type="Control" parent="."]
+margin_left = 527.0
+margin_top = 29.0
+margin_right = 527.0
+margin_bottom = 29.0
+script = ExtResource( 9 )
+
+[node name="DepthButton" type="Button" parent="Toolbar"]
+margin_left = -183.0
+margin_top = 3.0
+margin_right = -38.0
+margin_bottom = 30.0
+text = "Import depth image"
+
+[node name="ColourButton" type="Button" parent="Toolbar"]
+margin_left = -344.0
+margin_top = 3.0
+margin_right = -199.0
+margin_bottom = 30.0
+text = "Import color image"
+
+[node name="ExportButton" type="Button" parent="Toolbar"]
+margin_left = -23.0
+margin_top = 3.0
+margin_right = 122.0
+margin_bottom = 30.0
+text = "Export selected image"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="OpenFileDialog" type="FileDialog" parent="Toolbar"]
+margin_left = -424.0
+margin_top = 63.0
+margin_right = 371.0
+margin_bottom = 558.0
+rect_min_size = Vector2( 250, 87.5 )
+window_title = "Open a File"
+mode = 0
+access = 2
+filters = PoolStringArray( "*.png ; PNG images" )
+show_hidden_files = true
+current_dir = "/Users/sjerpsthomas/Documents/research_project/final_program_temp"
+current_path = "/Users/sjerpsthomas/Documents/research_project/final_program_temp/"
+
+[node name="SaveFileDialog" type="FileDialog" parent="Toolbar"]
+margin_left = -424.0
+margin_top = 63.0
+margin_right = 371.0
+margin_bottom = 558.0
+rect_min_size = Vector2( 250, 87.5 )
+access = 2
+filters = PoolStringArray( "*.png ; PNG images" )
+show_hidden_files = true
+current_dir = "/Users/sjerpsthomas/Documents/research_project/final_program_temp"
+current_path = "/Users/sjerpsthomas/Documents/research_project/final_program_temp/"
+
+[node name="ParameterToggle" type="Control" parent="Toolbar"]
+margin_left = -282.0
+margin_top = 19.0
+margin_right = -282.0
+margin_bottom = 19.0
+script = ExtResource( 8 )
+
+[node name="OptimizationLabel" type="Label" parent="Toolbar/ParameterToggle"]
+margin_left = 431.0
+margin_top = -15.0
+margin_right = 554.0
+margin_bottom = 12.0
+custom_colors/font_color = Color( 1, 1, 1, 1 )
+text = "Show parameters:"
+valign = 1
+
+[node name="OptimisationCheckButton" type="CheckButton" parent="Toolbar/ParameterToggle"]
+margin_left = 549.0
+margin_top = -22.0
+margin_right = 625.0
+margin_bottom = 18.0
+pressed = true
+
+[node name="Parameters" type="Control" parent="."]
+margin_left = 120.0
+margin_top = 120.0
+margin_right = 120.0
+margin_bottom = 120.0
+
+[node name="Generation" type="Control" parent="Parameters"]
+margin_top = -8.0
+margin_bottom = -8.0
+
+[node name="Label" type="Label" parent="Parameters/Generation"]
+margin_right = 336.0
+margin_bottom = 47.0
+custom_colors/font_color = Color( 1, 1, 1, 1 )
+custom_fonts/font = SubResource( 1 )
+text = "Image Generation"
+align = 1
+
+[node name="DepthMapping" type="Control" parent="Parameters/Generation"]
+margin_top = 64.0
+margin_bottom = 64.0
+
+[node name="NearRangeParameter" parent="Parameters/Generation/DepthMapping" instance=ExtResource( 1 )]
+param_name = "p_near"
+parameter_type = "generation"
+
+[node name="Label" parent="Parameters/Generation/DepthMapping/NearRangeParameter" index="0"]
+text = "p_near"
+
+[node name="Slider" parent="Parameters/Generation/DepthMapping/NearRangeParameter" index="1"]
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="FarRangeParameter" parent="Parameters/Generation/DepthMapping" instance=ExtResource( 1 )]
+margin_top = 32.0
+margin_bottom = 32.0
+param_name = "p_far"
+parameter_type = "generation"
+
+[node name="Label" parent="Parameters/Generation/DepthMapping/FarRangeParameter" index="0"]
+text = "p_far"
+
+[node name="Slider" parent="Parameters/Generation/DepthMapping/FarRangeParameter" index="1"]
+max_value = 1.0
+step = 0.01
+
+[node name="GradientParameter" parent="Parameters/Generation/DepthMapping" instance=ExtResource( 10 )]
+margin_top = 72.0
+margin_bottom = 72.0
+param_name = "gradient_mode"
+parameter_type = "generation"
+items = PoolStringArray( "Rainbow", "Red-to-white-to-blue" )
+
+[node name="Label" parent="Parameters/Generation/DepthMapping/GradientParameter" index="0"]
+margin_right = 104.0
+text = "(gradient)"
+
+[node name="ColourBlending" type="Control" parent="Parameters/Generation"]
+margin_top = 208.0
+margin_bottom = 208.0
+
+[node name="Amount" parent="Parameters/Generation/ColourBlending" instance=ExtResource( 1 )]
+param_name = "p_blending"
+parameter_type = "generation"
+
+[node name="Label" parent="Parameters/Generation/ColourBlending/Amount" index="0"]
+text = "p_blending"
+
+[node name="Slider" parent="Parameters/Generation/ColourBlending/Amount" index="1"]
+max_value = 1.0
+step = 0.01
+value = 0.5
+
+[node name="Mode" parent="Parameters/Generation/ColourBlending" instance=ExtResource( 10 )]
+margin_top = 40.0
+margin_bottom = 40.0
+param_name = "blending_mode"
+parameter_type = "generation"
+items = PoolStringArray( "Normal", "Colour" )
+
+[node name="Label" parent="Parameters/Generation/ColourBlending/Mode" index="0"]
+margin_right = 104.0
+text = "(blending mode)"
+
+[node name="Metric" type="Control" parent="Parameters"]
+margin_top = 304.0
+margin_bottom = 304.0
+
+[node name="Label" type="Label" parent="Parameters/Metric"]
+margin_right = 336.0
+margin_bottom = 47.0
+custom_colors/font_color = Color( 1, 1, 1, 1 )
+custom_fonts/font = SubResource( 1 )
+text = "Metric"
+align = 1
+
+[node name="LinearInterpolation" type="Control" parent="Parameters/Metric"]
+margin_top = 56.0
+margin_bottom = 56.0
+
+[node name="F" parent="Parameters/Metric/LinearInterpolation" instance=ExtResource( 1 )]
+param_name = "f"
+parameter_type = "metric"
+
+[node name="Label" parent="Parameters/Metric/LinearInterpolation/F" index="0"]
+text = "f"
+
+[node name="Slider" parent="Parameters/Metric/LinearInterpolation/F" index="1"]
+max_value = 1.0
+step = 0.01
+value = 0.5
+
+[node name="Results" type="Control" parent="."]
+anchor_left = 0.5
+anchor_right = 0.5
+
+[node name="Viewports" type="Control" parent="Results"]
+margin_left = 68.0
+margin_top = 141.0
+margin_right = 68.0
+margin_bottom = 141.0
+script = ExtResource( 3 )
+
+[node name="Tabs" type="Tabs" parent="Results/Viewports"]
+margin_top = -24.0
+margin_right = 448.0
+tab_align = 0
+
+[node name="SmoothedFinalImageViewportContainer" type="ViewportContainer" parent="Results/Viewports"]
+margin_right = 320.0
+margin_bottom = 240.0
+mouse_filter = 2
+
+[node name="Viewport" type="Viewport" parent="Results/Viewports/SmoothedFinalImageViewportContainer"]
+size = Vector2( 320, 240 )
+handle_input_locally = false
+usage = 0
+render_target_clear_mode = 2
+render_target_update_mode = 3
+
+[node name="Image" type="TextureRect" parent="Results/Viewports/SmoothedFinalImageViewportContainer/Viewport"]
+modulate = Color( 1, 1, 1, 0.12549 )
+margin_right = 320.0
+margin_bottom = 240.0
+texture = SubResource( 8 )
+stretch_mode = 1
+flip_v = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="MetricViewportContainer" type="ViewportContainer" parent="Results/Viewports"]
+margin_right = 320.0
+margin_bottom = 240.0
+mouse_filter = 2
+
+[node name="Viewport" type="Viewport" parent="Results/Viewports/MetricViewportContainer"]
+size = Vector2( 320, 240 )
+handle_input_locally = false
+usage = 0
+render_target_update_mode = 3
+
+[node name="Image" type="TextureRect" parent="Results/Viewports/MetricViewportContainer/Viewport"]
+material = SubResource( 6 )
+margin_right = 320.0
+margin_bottom = 240.0
+texture = ExtResource( 5 )
+stretch_mode = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="FinalImageViewportContainer" type="ViewportContainer" parent="Results/Viewports"]
+margin_right = 320.0
+margin_bottom = 240.0
+mouse_filter = 2
+
+[node name="Viewport" type="Viewport" parent="Results/Viewports/FinalImageViewportContainer"]
+size = Vector2( 320, 240 )
+handle_input_locally = false
+usage = 0
+render_target_update_mode = 3
+
+[node name="Image" type="TextureRect" parent="Results/Viewports/FinalImageViewportContainer/Viewport"]
+material = SubResource( 2 )
+margin_right = 320.0
+margin_bottom = 240.0
+texture = ExtResource( 5 )
+stretch_mode = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="MetricLabel" type="Label" parent="Results"]
+margin_left = 72.0
+margin_top = 391.0
+margin_right = 223.0
+margin_bottom = 418.0
+custom_colors/font_color = Color( 1, 1, 1, 1 )
+text = "Metric = ..."
+valign = 1
+
+[node name="OptimizationToggle" type="Control" parent="Results"]
+margin_top = -16.0
+margin_bottom = -16.0
+
+[node name="OptimizationLabel" type="Label" parent="Results/OptimizationToggle"]
+margin_left = 72.0
+margin_top = 432.0
+margin_right = 195.0
+margin_bottom = 459.0
+custom_colors/font_color = Color( 1, 1, 1, 1 )
+text = "Optimization:"
+valign = 1
+
+[node name="OptimisationCheckButton" type="CheckButton" parent="Results/OptimizationToggle"]
+margin_left = 182.0
+margin_top = 425.0
+margin_right = 258.0
+margin_bottom = 465.0
+
+[node name="ColourInputParameter" parent="Results" instance=ExtResource( 1 )]
+margin_left = 67.0
+margin_top = 460.0
+margin_right = 67.0
+margin_bottom = 460.0
+param_name = "colour_score"
+parameter_type = "final"
+
+[node name="Label" parent="Results/ColourInputParameter" index="0"]
+margin_left = -6.0
+margin_right = 98.0
+text = "Colour input:"
+
+[node name="Slider" parent="Results/ColourInputParameter" index="1"]
+margin_left = 126.0
+margin_right = 318.0
+max_value = 1.0
+step = 0.01
+value = 0.5
+
+[node name="DepthInputParameter" parent="Results" instance=ExtResource( 1 )]
+margin_left = 67.0
+margin_top = 492.0
+margin_right = 67.0
+margin_bottom = 492.0
+param_name = "depth_score"
+parameter_type = "final"
+
+[node name="Label" parent="Results/DepthInputParameter" index="0"]
+margin_left = -7.0
+margin_right = 97.0
+text = "Depth input:"
+
+[node name="Slider" parent="Results/DepthInputParameter" index="1"]
+margin_left = 126.0
+margin_right = 318.0
+max_value = 1.0
+step = 0.01
+value = 0.5
+
+[connection signal="pressed" from="Toolbar/DepthButton" to="Toolbar" method="_on_DepthButton_pressed"]
+[connection signal="pressed" from="Toolbar/ColourButton" to="Toolbar" method="_on_ColourButton_pressed"]
+[connection signal="pressed" from="Toolbar/ExportButton" to="Toolbar" method="_on_ExportButton_pressed"]
+[connection signal="file_selected" from="Toolbar/OpenFileDialog" to="Toolbar" method="_on_OpenFileDialog_file_selected"]
+[connection signal="file_selected" from="Toolbar/SaveFileDialog" to="Toolbar" method="_on_SaveFileDialog_file_selected"]
+[connection signal="toggled" from="Toolbar/ParameterToggle/OptimisationCheckButton" to="Toolbar/ParameterToggle" method="_on_OptimisationCheckButton_toggled"]
+[connection signal="tab_changed" from="Results/Viewports/Tabs" to="Results/Viewports" method="_on_Tabs_tab_changed"]
+[connection signal="toggled" from="Results/OptimizationToggle/OptimisationCheckButton" to="." method="_on_OptimisationCheckButton_toggled"]
+
+[editable path="Parameters/Generation/DepthMapping/NearRangeParameter"]
+[editable path="Parameters/Generation/DepthMapping/FarRangeParameter"]
+[editable path="Parameters/Generation/DepthMapping/GradientParameter"]
+[editable path="Parameters/Generation/ColourBlending/Amount"]
+[editable path="Parameters/Generation/ColourBlending/Mode"]
+[editable path="Parameters/Metric/LinearInterpolation/F"]
+[editable path="Results/ColourInputParameter"]
+[editable path="Results/DepthInputParameter"]
